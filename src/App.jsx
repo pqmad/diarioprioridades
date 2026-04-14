@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Check, X, Star, ShieldCheck, Smartphone,
   Clock, Download, BookOpen, Zap, ChevronDown, Globe,
@@ -17,10 +17,57 @@ const IMG = {
   inside3: './26.jpg',
   inside4: './130.jpg',
   bonos: './bonos.png',
-payments: './paymethods.webp',
+ payments: './paymethods.webp',
 };
 
 const CHECKOUT_URL = 'https://pay.hotmart.com/R105317315D';
+const BASE_PRICE_USD = 8.99;
+const BASE_PRICE_USD_CURRENCY = `$${BASE_PRICE_USD.toFixed(2)} USD`;
+
+const EXCHANGE_RATES = {
+  ARS: { rate: 1050, symbol: '$', locale: 'es-AR' },
+  BRL: { rate: 4.97, symbol: 'R$', locale: 'pt-BR' },
+  MXN: { rate: 17.15, symbol: '$', locale: 'es-MX' },
+  COP: { rate: 3850, symbol: '$', locale: 'es-CO' },
+  CLP: { rate: 940, symbol: '$', locale: 'es-CL' },
+  PEN: { rate: 3.75, symbol: 'S/', locale: 'es-PE' },
+  UYU: { rate: 39.5, symbol: '$', locale: 'es-UY' },
+  GTQ: { rate: 8, symbol: 'Q', locale: 'es-GT' },
+  CRC: { rate: 515, symbol: '₡', locale: 'es-CR' },
+  USD: { rate: 1, symbol: '$', locale: 'en-US' },
+  VES: { rate: 36, symbol: 'Bs', locale: 'es-VE' },
+  DOP: { rate: 58, symbol: 'RD$', locale: 'es-DO' },
+  PAB: { rate: 1, symbol: 'B/.', locale: 'es-PA' },
+  HNL: { rate: 24.7, symbol: 'L', locale: 'es-HN' },
+  NIO: { rate: 36.7, symbol: 'C$', locale: 'es-NI' },
+  SVC: { rate: 8.75, symbol: '$', locale: 'es-SV' },
+ PYG: { rate: 7650, symbol: '₲', locale: 'es-PY' },
+  ECS: { rate: 1, symbol: '$', locale: 'es-EC' },
+  BOB: { rate: 6.91, symbol: 'Bs', locale: 'es-BO' },
+};
+
+const COUNTRY_CURRENCY = {
+  AR: 'ARS',
+  BR: 'BRL',
+  MX: 'MXN',
+  CO: 'COP',
+  CL: 'CLP',
+  PE: 'PEN',
+  UY: 'UYU',
+  GT: 'GTQ',
+  CR: 'CRC',
+  US: 'USD',
+  BO: 'BOB',
+  EC: 'ECS',
+  PY: 'PYG',
+  VE: 'VES',
+  HN: 'HNL',
+  NI: 'NIO',
+  SV: 'SVC',
+  PA: 'PAB',
+  DO: 'DOP',
+  PR: 'USD',
+ };
 
 const FAQItem = ({ q, a }) => {
   const [open, setOpen] = useState(false);
@@ -35,13 +82,59 @@ const FAQItem = ({ q, a }) => {
   );
 };
 
+const getUserCurrency = async () => {
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    const data = await res.json();
+    const country = data.country_code;
+    return COUNTRY_CURRENCY[country] || 'USD';
+  } catch {
+    return 'USD';
+  }
+};
+
+const formatPrice = (currency, amount) => {
+  const rateInfo = EXCHANGE_RATES[currency];
+  if (!rateInfo) return `${BASE_PRICE_USD.toFixed(2)} USD`;
+  
+  const converted = amount * rateInfo.rate;
+  const formatted = new Intl.NumberFormat(rateInfo.locale, {
+    style: 'decimal',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(converted);
+  
+  return `${rateInfo.symbol}${formatted}`;
+};
+
 export default function App() {
+  const [userCurrency, setUserCurrency] = useState('USD');
+  const [priceLoaded, setPriceLoaded] = useState(false);
+  const [atBottom, setAtBottom] = useState(false);
+
+  useEffect(() => {
+    getUserCurrency().then((currency) => {
+      setUserCurrency(currency);
+      setPriceLoaded(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setAtBottom(window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 400);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const localPrice = formatPrice(userCurrency, BASE_PRICE_USD);
+
   return (
     <div>
 
       {/* PROMO BAR */}
       <div className="promo-bar">
-        Precio especial activo · <strong>$8.99 USD</strong> · Pago único · Acceso inmediato
+        Precio especial activo · <strong>{BASE_PRICE_USD_CURRENCY}</strong> · Pago único · Acceso inmediato
       </div>
 
       {/* HERO */}
@@ -77,7 +170,7 @@ export default function App() {
 
             <div className="hero-cta-wrap">
               <a href={CHECKOUT_URL} className="btn-main">
-                Quiero el Diario — $8.99 USD <Download size={18} />
+                Quiero el Diario — {BASE_PRICE_USD_CURRENCY} <Download size={18} />
               </a>
               <p className="btn-price-note">
                 Pago único · <strong>Precio de lanzamiento</strong> · 7 días de garantía
@@ -98,12 +191,12 @@ export default function App() {
             </div>
             <div className="hero-price-card">
               <p className="hpc-label">Precio especial hoy</p>
-              <p className="hpc-old">38.90 USD</p>
+              <p className="hpc-old">$45.99 USD</p>
               <p className="hpc-new">
-                <sup>$</sup>8.99<small>USD</small>
+                <sup>$</sup>{BASE_PRICE_USD}<small>USD</small>
               </p>
               <p className="hpc-note">Pago único · Tuyo para siempre</p>
-              <p className="hpc-local">Cargando precio en tu moneda...</p>
+              {priceLoaded ? <p className="hpc-local">Estimado moneda local: {localPrice}</p> : null}
               <a href={CHECKOUT_URL} className="hpc-btn">
                 Acceder ahora <Download size={16} />
               </a>
@@ -333,7 +426,7 @@ export default function App() {
               { price: '$80 USD', label: 'Una sesión de coach' },
               { price: '$15 USD', label: 'Cuaderno en librería' },
               { price: '$10/mes', label: 'App de productividad' },
-              { price: '$8.99', label: 'Este sistema · para siempre', featured: true },
+              { price: BASE_PRICE_USD_CURRENCY, label: 'Este sistema · para siempre', featured: true },
             ].map((item, i) => (
               <div key={i} className={`anc-card${item.featured ? ' featured' : ''}`}>
                 <span className="anc-price">{item.price}</span>
@@ -355,18 +448,18 @@ export default function App() {
           <p className="pricing-sub">Sin suscripciones. Sin letra chica.</p>
 
           <div className="price-card">
-            <p className="pc-old">38.90 USD</p>
+            <p className="pc-old">$45.99 USD</p>
             <div className="pc-price">
               <span className="pc-cur">$</span>
-              <span className="pc-num">8.99</span>
+              <span className="pc-num">{BASE_PRICE_USD}</span>
               <span className="pc-unit">USD</span>
             </div>
             <p className="pc-note">Pago único · Tuyo para siempre</p>
-            <p className="pc-local">Calculando precio en tu moneda...</p>
+            {priceLoaded ? <p className="hpc-local">Estimado moneda local: {localPrice}</p> : null}
 
             <div className="pc-country">
               <Check size={16} />
-              Si estás en Latam, el precio se muestra en tu moneda local al abrir Hotmart. Podés pagar con el método disponible en tu país.
+              El precio se muestra en tu moneda local al abrir Hotmart. Podés pagar con el método disponible en tu país.
             </div>
 
             <ul className="pc-checklist">
@@ -382,7 +475,7 @@ export default function App() {
             </ul>
 
             <a href={CHECKOUT_URL} className="pc-btn">
-              Quiero el Diario ahora — $8.99 USD <Download size={18} />
+              Quiero el Diario ahora — {BASE_PRICE_USD_CURRENCY} <Download size={18} />
             </a>
 
             <div className="guarantee">
@@ -437,7 +530,7 @@ export default function App() {
       {/* FINAL CTA */}
       <section className="final-cta">
         <h2>¿Cuándo es el momento<br />de empezar a <em>avanzar de verdad?</em></h2>
-        <p>Hoy podés tener el sistema completo por $8.99 USD. Un solo pago, para siempre.</p>
+        <p>Hoy podés tener el sistema completo por {BASE_PRICE_USD_CURRENCY}. Un solo pago, para siempre.</p>
         <a href={CHECKOUT_URL} className="btn-final">
           Quiero el Diario ahora <Download size={18} />
         </a>
@@ -448,6 +541,14 @@ export default function App() {
         <p className="footer-brand">Productos Digitales MAPQ</p>
         <p>© · Producto digital · Entrega inmediata por Hotmart · Pago seguro</p>
       </footer>
+
+      {!atBottom && (
+        <div className="float-bar">
+          <a href={CHECKOUT_URL} className="btn-float">
+            Quiero mi Diario — {BASE_PRICE_USD_CURRENCY} <Download size={18} />
+          </a>
+        </div>
+      )}
 
     </div>
   );
